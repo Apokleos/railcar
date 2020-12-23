@@ -25,9 +25,6 @@ Install rust:
     rustup toolchain install stable-x86_64-unknown-linux-gnu
     rustup default stable-x86_64-unknown-linux-gnu # for stable
     rustup target install x86_64-unknown-linux-musl # for stable
-    rustup toolchain install nightly-x86_64-unknown-linux-gnu
-    rustup default nightly-x86_64-unknown-linux-gnu # for nightly
-    rustup target install x86_64-unknown-linux-musl # for nightly
 
 Building can be done via build.sh:
 
