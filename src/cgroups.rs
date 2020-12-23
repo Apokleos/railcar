@@ -108,7 +108,7 @@ pub fn write_file(dir: &str, file: &str, data: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn read_file(dir: &str, file: &str) -> Result<(String)> {
+pub fn read_file(dir: &str, file: &str) -> Result<String> {
     let path = format!{"{}/{}", dir, file};
     let mut f = File::open(&path)?;
     let mut result = String::new();

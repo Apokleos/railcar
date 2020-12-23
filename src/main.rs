@@ -1,9 +1,6 @@
 #![allow(unknown_lints)]
 #![recursion_limit = "1024"]
-#![cfg_attr(feature = "nightly", feature(start))]
-#![cfg_attr(feature = "nightly", feature(alloc_system))]
-#[cfg(feature = "nightly")]
-extern crate alloc_system;
+// extern crate alloc_system;
 
 extern crate caps;
 #[macro_use]
@@ -149,8 +146,6 @@ static mut ARGC: isize = 0 as isize;
 static mut ARGV: *mut *mut i8 = 0 as *mut *mut i8;
 
 // using start instead of main to get direct access to arg0
-#[cfg(feature = "nightly")]
-#[start]
 fn start(argc: isize, argv: *const *const u8) -> isize {
     unsafe {
         // store args so we can access them later
@@ -454,7 +449,7 @@ fn state(id: &str, status: &str, pid: Pid, bundle: &str) -> oci::State {
 }
 
 // must be in instance_dir
-fn get_init_pid() -> Result<(Pid)> {
+fn get_init_pid() -> Result<Pid> {
     let mut pid = Pid::from_raw(-1);
     if let Ok(mut f) = File::open(INIT_PID) {
         let mut result = String::new();
@@ -466,7 +461,7 @@ fn get_init_pid() -> Result<(Pid)> {
     Ok(pid)
 }
 
-fn state_from_dir(id: &str, state_dir: &str) -> Result<(oci::State)> {
+fn state_from_dir(id: &str, state_dir: &str) -> Result<oci::State> {
     let dir = instance_dir(id, state_dir);
     chdir(&*dir).chain_err(|| format!("instance {} doesn't exist", id))?;
     let mut status = "creating";
@@ -1201,8 +1196,8 @@ fn run_container(
     }
 
     if csocketfd != -1 {
-        let mut slave: libc::c_int = unsafe { std::mem::uninitialized() };
-        let mut master: libc::c_int = unsafe { std::mem::uninitialized() };
+        let mut slave: libc::c_int = unsafe { std::mem::MaybeUninit::uninit().assume_init()};
+        let mut master: libc::c_int = unsafe { std::mem::MaybeUninit::uninit().assume_init() };
         let ret = unsafe {
             libc::openpty(
                 &mut master,
@@ -1593,7 +1588,7 @@ fn wait_for_pipe_vec(
     rfd: RawFd,
     timeout: i32,
     num: usize,
-) -> Result<(Vec<u8>)> {
+) -> Result<Vec<u8>> {
     let mut result = Vec::new();
     while result.len() < num {
         let pfds =
@@ -1718,7 +1713,7 @@ fn exit(exit_code: i8, sig: Option<Signal>) -> Result<()> {
     }
 }
 
-fn reap_children() -> Result<(WaitStatus)> {
+fn reap_children() -> Result<WaitStatus> {
     let mut result = WaitStatus::Exited(Pid::from_raw(0), 0);
     loop {
         match waitpid(Pid::from_raw(-1), Some(WaitPidFlag::WNOHANG)) {

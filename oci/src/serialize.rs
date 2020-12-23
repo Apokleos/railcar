@@ -22,19 +22,25 @@ impl fmt::Display for SerializeError {
 }
 
 impl Error for SerializeError {
-    fn description(&self) -> &str {
-        match *self {
-            SerializeError::Io(ref err) => err.description(),
-            SerializeError::Json(ref err) => err.description(),
-        }
-    }
-
-    fn cause(&self) -> Option<&Error> {
+    // fn description(&self) -> &str {
+    //     &*match *self {
+    //         SerializeError::Io(ref err) => format!("Error: {}", err),
+    //         SerializeError::Json(ref err) => format!("Error: {}", err),
+    //     }
+    // }
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
         match *self {
             SerializeError::Io(ref err) => Some(err),
             SerializeError::Json(ref err) => Some(err),
         }
     }
+
+    // fn cause(&self) -> Option<&dyn Error> {
+    //     match *self {
+    //         SerializeError::Io(ref err) => Some(err),
+    //         SerializeError::Json(ref err) => Some(err),
+    //     }
+    // }
 }
 
 impl From<io::Error> for SerializeError {

@@ -47,7 +47,7 @@ pub fn setrlimit(
         rlim_cur: soft,
         rlim_max: hard,
     };
-    let res = unsafe { libc::setrlimit(resource, rlim) };
+    let res = unsafe { libc::setrlimit(resource as u32, rlim) };
     Errno::result(res).map(drop)
 }
 
