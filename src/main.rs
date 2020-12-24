@@ -36,7 +36,7 @@ use errors::*;
 use lazy_static::initialize;
 use nix::errno::Errno;
 use nix::fcntl::{open, OFlag};
-use nix::poll::{poll, EventFlags, PollFd};
+use nix::poll::{poll, PollFd, PollFlags};
 use nix::sched::{setns, unshare, CloneFlags};
 use nix::sys::signal::{SigSet, Signal};
 use nix::sys::socket::{accept, bind, connect, listen, sendmsg, socket};
@@ -140,9 +140,7 @@ const INIT_PID: &'static str = "init.pid";
 const PROCESS_PID: &'static str = "process.pid";
 const TSOCKETFD: RawFd = 9;
 
-#[cfg(feature = "nightly")]
 static mut ARGC: isize = 0 as isize;
-#[cfg(feature = "nightly")]
 static mut ARGV: *mut *mut i8 = 0 as *mut *mut i8;
 
 // using start instead of main to get direct access to arg0
@@ -954,6 +952,7 @@ fn execute_hook(hook: &oci::Hook, state: &oci::State) -> Result<()> {
     debug!("executing hook {:?}", hook);
     let (rfd, wfd) =
         pipe2(OFlag::O_CLOEXEC).chain_err(|| "failed to create pipe")?;
+    unsafe{
     match fork()? {
         ForkResult::Child => {
             close(rfd).chain_err(|| "could not close rfd")?;
@@ -1006,7 +1005,8 @@ fn execute_hook(hook: &oci::Hook, state: &oci::State) -> Result<()> {
                 return Err(ErrorKind::InvalidHook(msg).into());
             }
         }
-    };
+    };}
+
     Ok(())
 }
 
@@ -1323,6 +1323,7 @@ fn fork_first(
     let pcond = Cond::new().chain_err(|| "failed to create cond")?;
     let (rfd, wfd) =
         pipe2(OFlag::O_CLOEXEC).chain_err(|| "failed to create pipe")?;
+    unsafe {
     match fork()? {
         ForkResult::Child => {
             close(rfd).chain_err(|| "could not close rfd")?;
@@ -1420,12 +1421,14 @@ fn fork_first(
             exit(exit_code as i8, sig)?;
         }
     };
+    }
     Ok((Pid::from_raw(-1), wfd))
 }
 
 fn fork_enter_pid(init: bool, daemonize: bool) -> Result<()> {
     // do the first fork right away because we must fork before we can
     // mount proc. The child will be in the pid namespace.
+    unsafe {
     match fork()? {
         ForkResult::Child => {
             if init {
@@ -1449,23 +1452,26 @@ fn fork_enter_pid(init: bool, daemonize: bool) -> Result<()> {
             debug!("second parent exiting");
             exit(0, None)?;
         }
-    };
+    };}
+
     Ok(())
 }
 
 fn fork_final_child(wfd: RawFd, tfd: RawFd, daemonize: bool) -> Result<()> {
     // fork again so child becomes pid 2
-    match fork()? {
-        ForkResult::Child => {
-            // child continues on
-            Ok(())
-        }
-        ForkResult::Parent { .. } => {
-            if tfd != -1 {
-                close(tfd).chain_err(|| "could not close trigger fd")?;
+    unsafe {
+        match fork()? {
+            ForkResult::Child => {
+                // child continues on
+                Ok(())
             }
-            do_init(wfd, daemonize)?;
-            Ok(())
+            ForkResult::Parent { .. } => {
+                if tfd != -1 {
+                    close(tfd).chain_err(|| "could not close trigger fd")?;
+                }
+                do_init(wfd, daemonize)?;
+                Ok(())
+            }
         }
     }
 }
@@ -1592,7 +1598,7 @@ fn wait_for_pipe_vec(
     let mut result = Vec::new();
     while result.len() < num {
         let pfds =
-            &mut [PollFd::new(rfd, EventFlags::POLLIN | EventFlags::POLLHUP)];
+            &mut [PollFd::new(rfd, PollFlags::POLLIN | PollFlags::POLLHUP)];
         match poll(pfds, timeout) {
             Err(e) => {
                 if e != ::nix::Error::Sys(Errno::EINTR) {
@@ -1611,13 +1617,13 @@ fn wait_for_pipe_vec(
             // continue on no events
             continue;
         }
-        if events.unwrap() == EventFlags::POLLNVAL {
+        if events.unwrap() == PollFlags::POLLNVAL {
             let msg = "file descriptor closed unexpectedly".to_string();
             return Err(ErrorKind::PipeClosed(msg).into());
         }
         if !events
             .unwrap()
-            .intersects(EventFlags::POLLIN | EventFlags::POLLHUP)
+            .intersects(PollFlags::POLLIN | PollFlags::POLLHUP)
         {
             // continue on other events (should not happen)
             debug!("got a continue on other events {:?}", events);
