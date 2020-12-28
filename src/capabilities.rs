@@ -14,7 +14,7 @@ fn to_set(caps: &[LinuxCapabilityType]) -> CapsHashSet {
 }
 
 pub fn reset_effective() -> ::Result<()> {
-    set(None, CapSet::Effective, ::caps::all())?;
+    set(None, CapSet::Effective, &::caps::all())?;
     Ok(())
 }
 
@@ -26,10 +26,10 @@ pub fn drop_privileges(cs: &LinuxCapabilities) -> ::Result<()> {
         drop(None, CapSet::Bounding, *c)?;
     }
     // set other sets for current process
-    set(None, CapSet::Effective, to_set(&cs.effective))?;
-    set(None, CapSet::Permitted, to_set(&cs.permitted))?;
-    set(None, CapSet::Inheritable, to_set(&cs.inheritable))?;
-    if let Err(e) = set(None, CapSet::Ambient, to_set(&cs.ambient)) {
+    set(None, CapSet::Effective, &to_set(&cs.effective))?;
+    set(None, CapSet::Permitted, &to_set(&cs.permitted))?;
+    set(None, CapSet::Inheritable, &to_set(&cs.inheritable))?;
+    if let Err(e) = set(None, CapSet::Ambient, &to_set(&cs.ambient)) {
         warn!("failed to set ambient capabilities: {}", e);
     }
     Ok(())

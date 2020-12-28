@@ -3,6 +3,7 @@ use libc::c_int;
 use nix::sys::signal::{kill, raise, sigaction};
 use nix::sys::signal::{SaFlags, SigAction, SigHandler, SigSet, Signal};
 use nix::unistd::Pid;
+use std::convert::TryFrom;
 
 pub fn pass_signals(child_pid: Pid) -> Result<()> {
     unsafe {
@@ -23,7 +24,7 @@ extern "C" fn child_handler(signo: c_int) {
     unsafe {
         let _ = kill(
             CHILD_PID.unwrap_or(Pid::from_raw(0)),
-            Signal::from_c_int(signo).unwrap(),
+            Signal::try_from(signo).unwrap(),
         );
     }
 }

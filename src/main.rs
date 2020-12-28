@@ -59,6 +59,7 @@ use std::os::unix::fs::symlink;
 use std::os::unix::io::{FromRawFd, RawFd};
 use std::result::Result as StdResult;
 use sync::Cond;
+use std::convert::TryFrom;
 
 lazy_static! {
     static ref DEFAULT_DEVICES: Vec<LinuxDevice> = {
@@ -140,24 +141,24 @@ const INIT_PID: &'static str = "init.pid";
 const PROCESS_PID: &'static str = "process.pid";
 const TSOCKETFD: RawFd = 9;
 
-static mut ARGC: isize = 0 as isize;
-static mut ARGV: *mut *mut i8 = 0 as *mut *mut i8;
-
-// using start instead of main to get direct access to arg0
-fn start(argc: isize, argv: *const *const u8) -> isize {
-    unsafe {
-        // store args so we can access them later
-        ARGC = argc;
-        ARGV = argv as *mut *mut i8;
-    }
-
-    // enable stack unwinding
-    if std::panic::catch_unwind(main).is_err() {
-        101
-    } else {
-        0
-    }
-}
+// static mut ARGC: isize = 0 as isize;
+// static mut ARGV: *mut *mut i8 = 0 as *mut *mut i8;
+//
+// // using start instead of main to get direct access to arg0
+// fn start(argc: isize, argv: *const *const u8) -> isize {
+//     unsafe {
+//         // store args so we can access them later
+//         ARGC = argc;
+//         ARGV = argv as *mut *mut i8;
+//     }
+//
+//     // enable stack unwinding
+//     if std::panic::catch_unwind(main).is_err() {
+//         101
+//     } else {
+//         0
+//     }
+// }
 
 // only show backtrace in debug mode
 #[cfg(not(debug_assertions))]
@@ -969,12 +970,12 @@ fn execute_hook(hook: &oci::Hook, state: &oci::State) -> Result<()> {
                 }
                 ForkResult::Parent { child } => {
                     close(rstdin).chain_err(|| "could not close rstdin")?;
-                    unsafe {
-                        // closes the file descriptor autmotaically
-                        state
-                            .to_writer(File::from_raw_fd(wstdin))
-                            .chain_err(|| "could not write state")?;
-                    }
+
+                    // closes the file descriptor autmotaically
+                    state
+                        .to_writer(File::from_raw_fd(wstdin))
+                        .chain_err(|| "could not write state")?;
+
                     let (exit_code, sig) = wait_for_child(child)?;
                     if let Some(signal) = sig {
                         // write signal to pipe.
@@ -1649,7 +1650,7 @@ fn wait_for_pipe_sig(rfd: RawFd, timeout: i32) -> Result<Option<Signal>> {
         return Ok(None);
     }
     let chain = || "invalid signal";
-    let s = Signal::from_c_int(result[0] as i32).chain_err(chain)?;
+    let s = Signal::try_from(result[0] as i32).chain_err(chain)?;
     Ok(Some(s))
 }
 
